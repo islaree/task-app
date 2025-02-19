@@ -118,6 +118,92 @@ const authenticateJWT = (
   );
 };
 
+// タスクの取得
+app.get("/tasks", authenticateJWT, async (req, res) => {
+  const { userId } = req.user as { userId: string }; // リクエストにユーザーIDを含めておく
+
+  try {
+    const result = await pool.query("SELECT * FROM tasks WHERE user_id = $1", [
+      userId,
+    ]);
+
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching tasks", err });
+  }
+});
+
+// タスクの追加
+app.post("/tasks", authenticateJWT, async (req, res) => {
+  const { title, description } = req.body;
+  const { userId } = req.user as { userId: string }; // リクエストにユーザーIDを含めておく
+
+  try {
+    const result = await pool.query(
+      "INSERT INTO tasks (user_id, title, description) VALUES ($1, $2, $3) RETURNING id, title, description, completed",
+      [userId, title, description]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ message: "Error insert task", err });
+  }
+});
+
+// タスクの削除
+app.delete(
+  "/tasks/:id",
+  authenticateJWT,
+  async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const { userId } = req.user as { userId: string };
+
+    try {
+      const result = await pool.query(
+        "DELETE FROM tasks WHERE id = $1 AND user_id = $2 RETURNING *",
+        [id, userId]
+      );
+
+      if (result.rowCount === 0) {
+        res.status(404).json({ message: "Task not found or unauthorized" });
+        return;
+      }
+
+      res.json({
+        message: "Task deleted successfully",
+        deletedTask: result.rows[0],
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Error delete task", err });
+    }
+  }
+);
+
+// TODO: タスクの更新
+app.put("/tasks/:id", authenticateJWT, async (req, res) => {
+  const { id } = req.params;
+  const { userId } = req.user as { userId: string };
+
+  try {
+    // 現在のタスクのステータスを取得
+    const result = await pool.query(
+      "SELECT completed FROM tasks WHERE id = $1 AND user_id = $2",
+      [id, userId]
+    );
+
+    // 現在のタスクのステータスを反転
+    const newCompleted = !result.rows[0].completed;
+
+    await pool.query(
+      "UPDATE tasks SET completed = $1 WHERE id = $2 AND user_id = $3",
+      [newCompleted, id, userId]
+    );
+    res.json({ message: "Task updated successfully", completed: newCompleted });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating task", err });
+  }
+});
+
 // 認証が必要なルート
 app.get("/protected", authenticateJWT, (req, res) => {
   res.send("This is a protected route");
