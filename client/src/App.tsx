@@ -1,7 +1,28 @@
-export default function App() {
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { Login } from "./components/pages/Login";
+import { Dashboard } from "./components/pages/Dashboard";
+import { AuthProvider } from "./AuthContext";
+import { PrivateRoute } from "./PrivateRoute";
+
+function App() {
   return (
-    <>
-      <h1>hello demo app</h1>
-    </>
+    <Router>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route element={<PrivateRoute />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/login" />} />
+        </Routes>
+      </AuthProvider>
+    </Router>
   );
 }
+
+export default App;
